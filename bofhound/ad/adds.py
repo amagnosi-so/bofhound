@@ -65,14 +65,38 @@ class ADDS():
         self.unknown_objects: list[dict] = []
 
     def import_objects(self, objects):
-        """Parse a list of dictionaries representing attributes of an AD object
-            and add or merge them into appropriate lists of objects in the ADDS instance
+        """
+        Improved version with better object detection and logging
+
+        Parse a list of dictionaries representing attributes of an AD object
+        and add or merge them into appropriate lists of objects in the ADDS instance
 
         objects: [] of {} containing attributes for AD objects
         """
 
+        # Statistics tracking
+        stats = {
+            'total': len(objects),
+            'schemas': 0,
+            'crossrefs': 0,
+            'users': 0,
+            'computers': 0,
+            'groups': 0,
+            'domains': 0,
+            'trusts': 0,
+            'ous': 0,
+            'gpos': 0,
+            'containers': 0,
+            'pki': 0,
+            'merged': 0,
+            'missing_dn': 0,
+            'unknown': 0
+        }
+
         for object in objects:
-            # check if object is a schema - exception for normally required attributes
+            # ========================================
+            # Handle Schema Objects (special case)
+            # ========================================
             schemaIdGuid = object.get(ADDS.AT_SCHEMAIDGUID, None)
             if schemaIdGuid:
                 new_schema = BloodHoundSchema(object)
@@ -80,131 +104,355 @@ class ADDS():
                     self.schemas.append(new_schema)
                     if new_schema.Name not in self.ObjectTypeGuidMap:
                         self.ObjectTypeGuidMap[new_schema.Name] = new_schema.SchemaIdGuid
+                    stats['schemas'] += 1
                 continue
 
-            # check if object is a crossRef - exception for normally required attributes
-            if 'top, crossRef' in object.get(ADDS.AT_OBJECTCLASS, ''):
+            # ========================================
+            # Handle CrossRef Objects (special case)
+            # ========================================
+            object_class_str = object.get(ADDS.AT_OBJECTCLASS, '')
+            if 'crossRef' in object_class_str.lower():
                 new_crossref = BloodHoundCrossRef(object)
                 if new_crossref.netBiosName is not None:
                     if new_crossref.netBiosName not in self.CROSSREF_MAP:
                         self.CROSSREF_MAP[new_crossref.netBiosName] = new_crossref
+                        stats['crossrefs'] += 1
                 continue
 
-            #
-            # if samaccounttype comes back as something other
-            #  than int, skip the object
-            #
-            try:
-                accountType = int(object.get(ADDS.AT_SAMACCOUNTTYPE, 0))
-            except:
-                continue
-
-            target_list = None
-
-            # objectClass: top, container
-            # objectClass: top, container, groupPolicyContainer
-            # objectClass: top, organizationalUnit
-
+            # ========================================
+            # Get Core Attributes
+            # ========================================
             dn = object.get(ADDS.AT_DISTINGUISHEDNAME, None)
             sid = object.get(ADDS.AT_OBJECTID, None)
             guid = object.get(ADDS.AT_OBJECTGUID, None)
 
-            # SID and DN are required attributes for bofhound objects
-            if dn is None or (sid is None and guid is None):
+            # DN is required for all normal objects
+            if dn is None:
+                logger.debug(
+                    "Object missing DN - objectClass: %s, hasSID: %s, hasGUID: %s",
+                    object_class_str if object_class_str else 'NONE',
+                    sid is not None,
+                    guid is not None
+                )
+                stats['missing_dn'] += 1
                 self.unknown_objects.append(object)
                 continue
 
+            # At least one identifier (SID or GUID) is helpful but not always required
+            # Some objects (containers, OUs) may only have GUID
+            if sid is None and guid is None:
+                logger.debug(
+                    "Object has DN but no SID/GUID: %s (class: %s)",
+                    dn,
+                    object_class_str
+                )
+                # Don't skip - will handle later
+
+            # ========================================
+            # Parse samAccountType (if present)
+            # ========================================
+            accountType = None
+            samaccounttype_val = object.get(ADDS.AT_SAMACCOUNTTYPE, None)
+            if samaccounttype_val is not None and samaccounttype_val != '':
+                try:
+                    accountType = int(samaccounttype_val)
+                except (ValueError, TypeError) as e:
+                    logger.debug(
+                        "Invalid samaccounttype '%s' for %s: %s",
+                        samaccounttype_val, dn, e
+                    )
+                    # Continue processing - not all objects have samaccounttype
+
+            # ========================================
+            # Check for existing object (merge case)
+            # ========================================
             originalObject = self.retrieve_object(dn.upper(), sid)
             bhObject = None
+            target_list = None
 
-            # Groups
-            if accountType in [268435456, 268435457, 536870912, 536870913]:
-                bhObject = BloodHoundGroup(object)
-                target_list = self.groups
+            # ========================================
+            # Normalize object classes for matching
+            # ========================================
+            object_classes = set()
+            if object_class_str:
+                object_classes = set(cls.strip().lower() for cls in object_class_str.split(','))
 
-            # Users
-            elif object.get(ADDS.AT_MSDS_GROUPMSAMEMBERSHIP, b'') != b'' \
-                or accountType in [805306368]:
-                bhObject = BloodHoundUser(object)
-                target_list = self.users
+            # ========================================
+            # Classify by samAccountType (if available)
+            # ========================================
+            if accountType is not None:
+                # Groups: 268435456, 268435457, 536870912, 536870913
+                if accountType in [268435456, 268435457, 536870912, 536870913]:
+                    bhObject = BloodHoundGroup(object)
+                    target_list = self.groups
+                    stats['groups'] += 1
 
-            # Computers
-            elif accountType in [805306369]:
-                bhObject = BloodHoundComputer(object)
-                target_list = self.computers
+                # Users and MSAs: 805306368
+                elif accountType == 805306368:
+                    bhObject = BloodHoundUser(object)
+                    target_list = self.users
+                    stats['users'] += 1
 
-            # Trust Accounts
-            elif accountType in [805306370]:
-                self.trustaccounts.append(object)
+                # Computers: 805306369
+                elif accountType == 805306369:
+                    bhObject = BloodHoundComputer(object)
+                    target_list = self.computers
+                    stats['computers'] += 1
 
-            # Other Things :)
-            else:
-                object_class = object.get(ADDS.AT_OBJECTCLASS, '')
-                # if 'top, domain' in object_class or 'top, builtinDomain' in object_class:
-                if 'top, domain' in object_class:
-                    if 'objectsid' in object:
-                        bhObject = BloodHoundDomain(object)
-                        self.add_domain(bhObject)
-                        target_list = self.domains
-                # grab domain trusts
-                elif 'trustedDomain' in object_class:
+                # Trust Accounts: 805306370
+                elif accountType == 805306370:
+                    self.trustaccounts.append(object)
+                    stats['trusts'] += 1
+                    continue  # Special handling, not added to standard lists
+
+            # ========================================
+            # Classify by Object Class
+            # ========================================
+            if bhObject is None:
+                # Domains
+                if 'domain' in object_classes and 'objectsid' in object:
+                    bhObject = BloodHoundDomain(object)
+                    self.add_domain(bhObject)
+                    target_list = self.domains
+                    stats['domains'] += 1
+
+                # Domain Trusts
+                elif 'trusteddomain' in object_classes:
                     bhObject = BloodHoundDomainTrust(object)
                     target_list = self.trusts
-                # grab OUs
-                elif 'top, organizationalUnit' in object_class:
+                    stats['trusts'] += 1
+
+                # Organizational Units
+                elif 'organizationalunit' in object_classes:
                     bhObject = BloodHoundOU(object)
                     target_list = self.ous
-                elif 'container, groupPolicyContainer' in object_class:
+                    stats['ous'] += 1
+
+                # Group Policy Objects
+                elif 'grouppolicycontainer' in object_classes:
                     bhObject = BloodHoundGPO(object)
                     target_list = self.gpos
-                # grab PKIs
-                elif 'top, certificationAuthority' in object_class:
-                    if 'CN=AIA,' in object.get('distinguishedname'):
+                    stats['gpos'] += 1
+
+                # Managed Service Accounts (gMSA and sMSA)
+                elif 'msds-groupmanagedserviceaccount' in object_classes or \
+                        'msds-managedserviceaccount' in object_classes or \
+                        object.get(ADDS.AT_MSDS_GROUPMSAMEMBERSHIP, b'') != b'':
+                    bhObject = BloodHoundUser(object)
+                    target_list = self.users
+                    stats['users'] += 1
+
+                # PKI - Certification Authorities
+                elif 'certificationauthority' in object_classes:
+                    if 'CN=AIA,' in dn:
                         bhObject = BloodHoundAIACA(object)
                         target_list = self.aiacas
-                    elif 'CN=Certification Authorities,' in object.get('distinguishedname') :
+                        stats['pki'] += 1
+                    elif 'CN=Certification Authorities,' in dn:
                         bhObject = BloodHoundRootCA(object)
                         target_list = self.rootcas
-                    elif object.get('distinguishedname').upper().startswith('CN=NTAUTHCERTIFICATES,CN=PUBLIC KEY SERVICES,CN=SERVICES,CN=CONFIGURATION,'):
+                        stats['pki'] += 1
+                    elif dn.upper().startswith(
+                            'CN=NTAUTHCERTIFICATES,CN=PUBLIC KEY SERVICES,CN=SERVICES,CN=CONFIGURATION,'):
                         bhObject = BloodHoundNTAuthStore(object)
                         target_list = self.ntauthstores
-                elif 'top, msPKI-Enterprise-Oid' in object_class:
-                    # only want these if flags property is 2, ref: https://github.com/BloodHoundAD/SharpHoundCommon/blob/ea6b097927c5bb795adb8589e9a843293d36ae37/src/CommonLib/Extensions.cs#L402
-                    if 'flags' in object:
-                        if object.get('flags') == '2':
-                            bhObject = BloodHoundIssuancePolicy(object)
-                            target_list = self.issuancepolicies
-                elif 'top, pKIEnrollmentService' in object_class:
+                        stats['pki'] += 1
+
+                # PKI - Enterprise OIDs (Issuance Policies)
+                elif 'mspki-enterprise-oid' in object_classes:
+                    # Only want these if flags property is 2
+                    if object.get('flags') == '2':
+                        bhObject = BloodHoundIssuancePolicy(object)
+                        target_list = self.issuancepolicies
+                        stats['pki'] += 1
+
+                # PKI - Enrollment Services
+                elif 'pkienrollmentservice' in object_classes:
                     bhObject = BloodHoundEnterpriseCA(object)
                     target_list = self.enterprisecas
-                # grab PKI Templates
-                elif 'top, pKICertificateTemplate' in object_class:
+                    stats['pki'] += 1
+
+                # PKI - Certificate Templates
+                elif 'pkicertificatetemplate' in object_classes:
                     bhObject = BloodHoundCertTemplate(object)
                     target_list = self.certtemplates
-                elif 'top, container' in object_class:
-                    if not (re.search(r'\{.*\},CN=Policies,CN=System,', object.get('distinguishedname')) or 'CN=Operations,CN=DomainUpdates,CN=System' in object.get('distinguishedname')):
+                    stats['pki'] += 1
+
+                # Containers (with exclusions)
+                elif 'container' in object_classes:
+                    # Exclude certain system containers that aren't useful
+                    if not (re.search(r'\{.*\},CN=Policies,CN=System,', dn) or
+                            'CN=Operations,CN=DomainUpdates,CN=System' in dn):
                         bhObject = BloodHoundContainer(object)
                         target_list = self.containers
-                # some well known SIDs dont return the accounttype property
+                        stats['containers'] += 1
+
+                # Well-known SIDs (fallback matching)
                 elif object.get(ADDS.AT_NAME) in ADUtils.WELLKNOWN_SIDS:
-                    bhObject, target_list =  self._lookup_known_sid(object, object.get(ADDS.AT_NAME))
+                    bhObject, target_list = self._lookup_known_sid(object, object.get(ADDS.AT_NAME))
+                    if bhObject:
+                        if isinstance(bhObject, BloodHoundUser):
+                            stats['users'] += 1
+                        elif isinstance(bhObject, BloodHoundGroup):
+                            stats['groups'] += 1
+                        else:
+                            stats['computers'] += 1
+
                 elif object.get(ADDS.AT_COMMONNAME) in ADUtils.WELLKNOWN_SIDS:
-                    bhObject, target_list =  self._lookup_known_sid(object, object.get(ADDS.AT_COMMONNAME))
+                    bhObject, target_list = self._lookup_known_sid(object, object.get(ADDS.AT_COMMONNAME))
+                    if bhObject:
+                        if isinstance(bhObject, BloodHoundUser):
+                            stats['users'] += 1
+                        elif isinstance(bhObject, BloodHoundGroup):
+                            stats['groups'] += 1
+                        else:
+                            stats['computers'] += 1
+
+                # Foreign Security Principals (might be useful to track)
+                elif 'foreignsecurityprincipal' in object_classes:
+                    # These are references to external domain principals
+                    # Could be treated as generic objects or skipped
+                    logger.debug("Skipping Foreign Security Principal: %s", dn)
+                    continue
+
+                # Contact objects (usually not needed for BloodHound)
+                elif 'contact' in object_classes:
+                    logger.debug("Skipping contact object: %s", dn)
+                    continue
+
+                # Unknown object type
                 else:
+                    self._log_unknown_object(object, object_classes, accountType)
+                    stats['unknown'] += 1
                     self.unknown_objects.append(object)
+                    continue
 
-
+            # ========================================
+            # Handle Merging or Adding
+            # ========================================
             if originalObject:
                 if bhObject:
                     originalObject.merge_entry(bhObject)
                 else:
                     bhObject = BloodHoundObject(object)
                     originalObject.merge_entry(bhObject)
+                stats['merged'] += 1
             elif bhObject:
                 target_list.append(bhObject)
-                if not isinstance(bhObject, BloodHoundDomainTrust): # trusts don't have SIDs
+                # Trusts don't have SIDs
+                if not isinstance(bhObject, BloodHoundDomainTrust):
                     self.add_object_to_maps(bhObject)
 
+        # ========================================
+        # Report Statistics
+        # ========================================
+        logger.info("Object Import Statistics:")
+        logger.info("  Total objects processed: %d", stats['total'])
+        logger.info("  Users: %d", stats['users'])
+        logger.info("  Computers: %d", stats['computers'])
+        logger.info("  Groups: %d", stats['groups'])
+        logger.info("  Domains: %d", stats['domains'])
+        logger.info("  OUs: %d", stats['ous'])
+        logger.info("  GPOs: %d", stats['gpos'])
+        logger.info("  Containers: %d", stats['containers'])
+        logger.info("  PKI Objects: %d", stats['pki'])
+        logger.info("  Schemas: %d", stats['schemas'])
+        logger.info("  CrossRefs: %d", stats['crossrefs'])
+        logger.info("  Trusts: %d", stats['trusts'])
+        logger.info("  Merged: %d", stats['merged'])
+        if stats['missing_dn'] > 0:
+            logger.warning("  Objects missing DN: %d", stats['missing_dn'])
+        if stats['unknown'] > 0:
+            logger.warning("  Unknown objects: %d", stats['unknown'])
+            self.analyze_unknown_objects()
+
+    def _log_unknown_object(self, object, object_classes, accountType):
+        """Log details about unknown objects for debugging"""
+        dn = object.get(ADDS.AT_DISTINGUISHEDNAME, 'NO_DN')
+        object_class_str = object.get(ADDS.AT_OBJECTCLASS, 'NO_CLASS')
+
+        logger.warning(
+            "Unknown object - DN: %s",
+            dn
+        )
+        logger.debug(
+            "  objectClass: %s",
+            object_class_str
+        )
+        logger.debug(
+            "  Normalized classes: %s",
+            ', '.join(sorted(object_classes)) if object_classes else 'NONE'
+        )
+        logger.debug(
+            "  samAccountType: %s",
+            accountType if accountType is not None else 'NONE'
+        )
+        logger.debug(
+            "  Has SID: %s, Has GUID: %s",
+            ADDS.AT_OBJECTID in object,
+            ADDS.AT_OBJECTGUID in object
+        )
+
+        # Show a sample of other attributes
+        interesting_attrs = ['name', 'cn', 'ou', 'objectcategory']
+        for attr in interesting_attrs:
+            if attr in object:
+                logger.debug("  %s: %s", attr, object[attr])
+
+    def analyze_unknown_objects(self):
+        """Analyze unknown objects to identify patterns"""
+        if not self.unknown_objects:
+            return
+
+        logger.info("=" * 60)
+        logger.info("UNKNOWN OBJECTS ANALYSIS")
+        logger.info("=" * 60)
+
+        # Group by object class
+        by_class = {}
+        for obj in self.unknown_objects:
+            obj_class = obj.get(ADDS.AT_OBJECTCLASS, 'NO_CLASS')
+            if obj_class not in by_class:
+                by_class[obj_class] = []
+            by_class[obj_class].append(obj)
+
+        # Report summary sorted by frequency
+        logger.info("Unknown objects grouped by class (top 20):")
+        for i, (obj_class, objects) in enumerate(
+                sorted(by_class.items(), key=lambda x: len(x[1]), reverse=True)[:20]
+        ):
+            logger.info("  %2d. [%4d objects] %s", i + 1, len(objects), obj_class)
+
+            # Show a few example DNs for this class
+            if len(objects) <= 3:
+                for obj in objects:
+                    logger.info("       - %s", obj.get(ADDS.AT_DISTINGUISHEDNAME, 'NO_DN'))
+            else:
+                # Show first 3 examples
+                for obj in objects[:3]:
+                    logger.info("       - %s", obj.get(ADDS.AT_DISTINGUISHEDNAME, 'NO_DN'))
+                logger.info("       ... and %d more", len(objects) - 3)
+
+        logger.info("=" * 60)
+
+        # Group by DN pattern (first CN/OU component)
+        by_dn_pattern = {}
+        for obj in self.unknown_objects:
+            dn = obj.get(ADDS.AT_DISTINGUISHEDNAME, '')
+            if dn:
+                # Extract first component (e.g., "CN=Something" or "OU=Something")
+                first_component = dn.split(',')[0] if ',' in dn else dn
+                pattern = first_component.split('=')[0] if '=' in first_component else 'UNKNOWN'
+
+                if pattern not in by_dn_pattern:
+                    by_dn_pattern[pattern] = []
+                by_dn_pattern[pattern].append(obj)
+
+        logger.info("Unknown objects grouped by DN pattern:")
+        for pattern, objects in sorted(by_dn_pattern.items(), key=lambda x: len(x[1]), reverse=True):
+            logger.info("  [%4d objects] %s=...", len(objects), pattern)
+
+        logger.info("=" * 60)
 
     def add_object_to_maps(self, object:BloodHoundObject):
         if object.ObjectIdentifier:

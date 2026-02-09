@@ -1,3 +1,4 @@
+import base64
 from bloodhound.ad.utils import ADUtils
 from bloodhound.ad.trusts import ADDomainTrust
 from impacket.ldap.ldaptypes import LDAP_SID
@@ -33,7 +34,8 @@ class BloodHoundDomainTrust(object):
             domain = ADUtils.ldap2domain(object.get('distinguishedname')).upper()
             logger.debug(f'Reading trust relationship between {ColorScheme.domain}{domain}[/] and {ColorScheme.domain}{trust_partner}[/]', extra=OBJ_EXTRA_FMT)
             domainsid = LDAP_SID()
-            domainsid.fromCanonical(object.get('securityidentifier'))
+            sid_bytes = base64.b64decode(object.get('securityidentifier'))
+            domainsid.fromString(sid_bytes)
             trust = ADDomainTrust(trust_partner, int(object.get('trustdirection')), object.get('trusttype'), int(object.get('trustattributes')), domainsid.getData())
             self.TrustProperties = trust.to_output()
 

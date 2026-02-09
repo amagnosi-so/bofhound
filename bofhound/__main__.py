@@ -1,9 +1,11 @@
 """Entry point for bofhound CLI application."""
+import json
 import sys
 import logging
 import typer
 from bofhound.parsers import ParserType, ParsingPipelineFactory
-from bofhound.parsers.data_sources import FileDataSource, MythicDataSource, OutflankDataStream
+from bofhound.parsers.data_sources import FileDataSource, MythicDataSource, OutflankDataStream, \
+    LzmaFileDataStream
 from bofhound.writer import BloodHoundWriter
 from bofhound.uploader import BloodHoundUploader
 from bofhound.ad import ADDS
@@ -110,6 +112,12 @@ def main(
                 sys.exit(-1)
             data_source = MythicDataSource(mythic_server, mythic_token)
 
+        case ParserType.LDAPDUMP:
+            logger.debug("Using LdapDump parser")
+            data_source = FileDataSource(
+                str(input_files), "*.bin", stream_type=LzmaFileDataStream
+            )
+
         case _:
             raise ValueError(f"Unknown parser type: {parser_type}")
 
@@ -138,6 +146,8 @@ def main(
     logger.info("Parsed %d Computers", len(ad.computers))
     logger.info("Parsed %d Domains", len(ad.domains))
     logger.info("Parsed %d Trust Accounts", len(ad.trustaccounts))
+    with open("trustaccounts.json", "w") as fp:
+        json.dump(ad.trustaccounts, fp, indent=2)
     logger.info("Parsed %d OUs", len(ad.ous))
     logger.info("Parsed %d Containers", len(ad.containers))
     logger.info("Parsed %d GPOs", len(ad.gpos))
@@ -150,6 +160,8 @@ def main(
     logger.info("Parsed %d Schemas", len(ad.schemas))
     logger.info("Parsed %d Referrals", len(ad.CROSSREF_MAP))
     logger.info("Parsed %d Unknown Objects", len(ad.unknown_objects))
+    with open("unknown.json", "w") as fp:
+        json.dump(ad.unknown_objects, fp, indent=2)
     logger.info("Parsed %d Sessions", len(broker.sessions))
     logger.info("Parsed %d Privileged Sessions", len(broker.privileged_sessions))
     logger.info("Parsed %d Registry Sessions", len(broker.registry_sessions))
