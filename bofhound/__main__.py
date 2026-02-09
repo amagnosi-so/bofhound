@@ -87,6 +87,10 @@ def main(
             logger.debug("Using ldapsearch parser")
             data_source = FileDataSource(str(input_files), "beacon*.log")
 
+            # if no CS logs were found, search for pyldapsearch logs or SoaPy logs
+            if len(list(data_source.get_data_streams())) == 0:
+                data_source = FileDataSource(str(input_files), "*.log")
+
         case ParserType.BRC4:
             logger.debug("Using Brute Ratel parser")
             if input_files == "/opt/cobaltstrike/logs":
@@ -159,6 +163,7 @@ def main(
     logger.info("Parsed %d Cert Templates", len(ad.certtemplates))
     logger.info("Parsed %d Schemas", len(ad.schemas))
     logger.info("Parsed %d Referrals", len(ad.CROSSREF_MAP))
+    logger.info("Parsed %d DNS nodes", len(ad.DNSNODE_MAP))
     logger.info("Parsed %d Unknown Objects", len(ad.unknown_objects))
     with open("unknown.json", "w") as fp:
         json.dump(ad.unknown_objects, fp, indent=2)

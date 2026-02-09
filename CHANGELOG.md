@@ -1,4 +1,29 @@
 # Changelog
+## [0.4.23] - 1/29/2026
+### Fixes
+- Fix crash occuring when certificate template `mspki-template-schema-version` attribute is not present ([#52](https://github.com/coffeegist/bofhound/issues/52))
+
+## [0.4.22] - 1/29/2026
+### Fixes
+- ACL parsing fixes to more closely mirror SharpHound ([#53](https://github.com/coffeegist/bofhound/pull/53/))
+
+## [0.4.21] - 1/14/2026
+### Added
+- Add ability to parse dnsNode objects and add IP addresses to computer properties by matching on dNSHostName [#51](https://github.com/coffeegist/bofhound/pull/51)
+
+## [0.4.20] - 12/16/2025
+### Fixes
+- Fix [#46](https://github.com/coffeegist/bofhound/issues/46) which caused well-known SIDs (groups) to be mising from bofhound output
+
+## [0.4.19] - 12/12/2025
+### Fixes
+- Fix [#47](https://github.com/coffeegist/bofhound/issues/47)
+
+## [0.4.18] - 11/22/2025
+### Fixes
+- Fix ADCSESC1 edge creation
+- Fix [#44](https://github.com/coffeegist/bofhound/issues/44)
+
 ## [0.4.17] - 10/30/2025
 ### Performance
 - Optimized group membership resolution algorithm from polynomial to linear complexity using reverse index lookups
