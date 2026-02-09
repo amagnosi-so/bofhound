@@ -25,8 +25,8 @@ class BloodHoundUser(BloodHoundObject):
         'memberof'
     ]
 
-    def __init__(self, object=None):
-        super().__init__(object)
+    def __init__(self, _object=None):
+        super().__init__(_object)
 
         self._entry_type = "User"
         self.PrimaryGroupSid = None
@@ -38,23 +38,23 @@ class BloodHoundUser(BloodHoundObject):
         self.IsACLProtected = False
         self.MemberOfDNs = []
 
-        if isinstance(object, dict):
-            self.PrimaryGroupSid = self.get_primary_membership(object) # Returns none if not exist
+        if isinstance(_object, dict):
+            self.PrimaryGroupSid = self.get_primary_membership(_object) # Returns none if not exist
 
-            if 'distinguishedname' in object.keys() and 'samaccountname' in object.keys():
-                domain = ADUtils.ldap2domain(object.get('distinguishedname')).upper()
-                name = f'{object.get("samaccountname")}@{domain}'.upper()
+            if 'distinguishedname' in _object.keys() and 'samaccountname' in _object.keys():
+                domain = ADUtils.ldap2domain(_object.get('distinguishedname')).upper()
+                name = f'{_object.get("samaccountname")}@{domain}'.upper()
                 self.Properties["name"] = name
                 self.Properties["domain"] = domain
                 logger.debug(f"Reading User object {ColorScheme.user}{name}[/]", extra=OBJ_EXTRA_FMT)
 
-            if 'admincount' in object.keys():
-                self.Properties["admincount"] = int(object.get('admincount')) == 1 # do not move this lower, it may break imports for users
+            if 'admincount' in _object.keys():
+                self.Properties["admincount"] = int(_object.get('admincount')) == 1 # do not move this lower, it may break imports for users
 
             # self.Properties["highvalue"] = False,
 
-            if 'useraccountcontrol' in object.keys():
-                uac = int(object.get('useraccountcontrol', 0))
+            if 'useraccountcontrol' in _object.keys():
+                uac = int(_object.get('useraccountcontrol', 0))
                 self.Properties["unconstraineddelegation"] = uac & 0x00080000 == 0x00080000
                 self.Properties["passwordnotreqd"] = uac & 0x00000020 == 0x00000020
                 self.Properties["enabled"] = uac & 2 == 0
@@ -63,69 +63,69 @@ class BloodHoundUser(BloodHoundObject):
                 self.Properties["trustedtoauth"] = uac & 0x01000000 == 0x01000000
                 self.Properties["pwdneverexpires"] = uac & 0x00010000 == 0x00010000
 
-            if 'lastlogon' in object.keys():
+            if 'lastlogon' in _object.keys():
                 self.Properties["lastlogon"] = ADUtils.win_timestamp_to_unix(
-                    int(object.get('lastlogon'))
+                    int(_object.get('lastlogon'))
                 )
 
-            if 'lastlogontimestamp' in object.keys():
+            if 'lastlogontimestamp' in _object.keys():
                 self.Properties["lastlogontimestamp"] = ADUtils.win_timestamp_to_unix(
-                    int(object.get('lastlogontimestamp'))
+                    int(_object.get('lastlogontimestamp'))
                 )
 
-            if 'pwdlastset' in object.keys():
+            if 'pwdlastset' in _object.keys():
                 self.Properties["pwdlastset"] = ADUtils.win_timestamp_to_unix(
-                    int(object.get('pwdlastset'))
+                    int(_object.get('pwdlastset'))
                 )
 
-            if 'useraccountcontrol' in object.keys():
-                self.Properties["dontreqpreauth"] = int(object.get('useraccountcontrol', 0)) & 0x00400000 == 0x00400000
-                self.Properties["pwdneverexpires"] = int(object.get('useraccountcontrol', 0)) & 0x00010000 == 0x00010000
-                self.Properties["sensitive"] = int(object.get('useraccountcontrol', 0)) & 0x00100000 == 0x00100000
+            if 'useraccountcontrol' in _object.keys():
+                self.Properties["dontreqpreauth"] = int(_object.get('useraccountcontrol', 0)) & 0x00400000 == 0x00400000
+                self.Properties["pwdneverexpires"] = int(_object.get('useraccountcontrol', 0)) & 0x00010000 == 0x00010000
+                self.Properties["sensitive"] = int(_object.get('useraccountcontrol', 0)) & 0x00100000 == 0x00100000
 
-            if 'serviceprincipalname' in object.keys():
-                self.Properties["serviceprincipalnames"] = object.get('serviceprincipalname').split(',')
+            if 'serviceprincipalname' in _object.keys():
+                self.Properties["serviceprincipalnames"] = _object.get('serviceprincipalname').split(',')
                 self.Properties['hasspn'] = True
             else:
                 self.Properties["serviceprincipalnames"] = []
                 self.Properties['hasspn'] = False
 
-            if 'serviceprincipalname' in object.keys():
-                self.Properties["hasspn"] = len(object.get('serviceprincipalname', [])) > 0
+            if 'serviceprincipalname' in _object.keys():
+                self.Properties["hasspn"] = len(_object.get('serviceprincipalname', [])) > 0
 
-            if 'samaccounttype' in object.keys():
-                self.Properties["samaccounttype"] = object.get('samaccounttype')
+            if 'samaccounttype' in _object.keys():
+                self.Properties["samaccounttype"] = _object.get('samaccounttype')
             
-            if 'displayname' in object.keys():
-                self.Properties["displayname"] = object.get('displayname')
+            if 'displayname' in _object.keys():
+                self.Properties["displayname"] = _object.get('displayname')
 
-            if 'mail' in object.keys():
-                self.Properties["email"] = object.get('mail')
+            if 'mail' in _object.keys():
+                self.Properties["email"] = _object.get('mail')
 
-            if 'title' in object.keys():
-                self.Properties["title"] = object.get('title')
+            if 'title' in _object.keys():
+                self.Properties["title"] = _object.get('title')
 
-            if 'homedirectory' in object.keys():
-                self.Properties["homedirectory"] = object.get('homedirectory')
+            if 'homedirectory' in _object.keys():
+                self.Properties["homedirectory"] = _object.get('homedirectory')
 
-            if 'description' in object.keys():
-                self.Properties["description"] = object.get('description')
+            if 'description' in _object.keys():
+                self.Properties["description"] = _object.get('description')
 
-            if 'userpassword' in object.keys():
-                self.Properties["userpassword"] = ADUtils.ensure_string(object.get('userpassword'))
+            if 'userpassword' in _object.keys():
+                self.Properties["userpassword"] = ADUtils.ensure_string(_object.get('userpassword'))
 
-            if 'sidhistory' in object.keys():
-                self.Properties["sidhistory"] = [LDAP_SID(bsid).formatCanonical() for bsid in object.get('sIDHistory', [])]
+            if 'sidhistory' in _object.keys():
+                self.Properties["sidhistory"] = [LDAP_SID(bsid).formatCanonical() for bsid in _object.get('sIDHistory', [])]
 
-            if 'msds-allowedtodelegateto' in object.keys():
-                if len(object.get('msds-allowedtodelegateto', [])) > 0:
-                    self.Properties['allowedtodelegate'] = object.get('msds-allowedtodelegateto', [])
+            if 'msds-allowedtodelegateto' in _object.keys():
+                if len(_object.get('msds-allowedtodelegateto', [])) > 0:
+                    self.Properties['allowedtodelegate'] = _object.get('msds-allowedtodelegateto', [])
 
-            if 'ntsecuritydescriptor' in object.keys():
-                self.RawAces = object['ntsecuritydescriptor']
+            if 'ntsecuritydescriptor' in _object.keys():
+                self.RawAces = _object['ntsecuritydescriptor']
 
-            if 'memberof' in object.keys():
-                self.MemberOfDNs = [f'CN={dn.upper()}' for dn in object.get('memberof').split(', CN=')]
+            if 'memberof' in _object.keys():
+                self.MemberOfDNs = [f'CN={dn.upper()}' for dn in _object.get('memberof').split(', CN=')]
                 if len(self.MemberOfDNs) > 0:
                     self.MemberOfDNs[0] = self.MemberOfDNs[0][3:]
 

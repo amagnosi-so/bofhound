@@ -16,8 +16,8 @@ class BloodHoundGroup(BloodHoundObject):
         'member', 'memberof'
     ]
 
-    def __init__(self, object):
-        super().__init__(object)
+    def __init__(self, _object):
+        super().__init__(_object)
 
         self._entry_type = "Group"
         self.Members = []
@@ -29,39 +29,39 @@ class BloodHoundGroup(BloodHoundObject):
         self.MemberOfDNs = []
         self.IsACLProtected = False
 
-        if 'distinguishedname' in object.keys() and 'samaccountname' in object.keys():
-            domain = ADUtils.ldap2domain(object.get('distinguishedname')).upper()
-            name = f'{object.get("samaccountname")}@{domain}'.upper()
+        if 'distinguishedname' in _object.keys() and 'samaccountname' in _object.keys():
+            domain = ADUtils.ldap2domain(_object.get('distinguishedname')).upper()
+            name = f'{_object.get("samaccountname")}@{domain}'.upper()
             self.Properties["name"] = name
             self.Properties["domain"] = domain
             logger.debug(f"Reading Group object {ColorScheme.group}{name}[/]", extra=OBJ_EXTRA_FMT)
 
-        if 'objectsid' in object.keys():
-            objectid = object.get('objectsid')
+        if 'objectsid' in _object.keys():
+            objectid = _object.get('objectsid')
             if objectid not in ADUtils.WELLKNOWN_SIDS:
                 self.Properties["domainsid"] = objectid.rsplit('-',1)[0]
 
-        if 'distinguishedname' in object.keys():
-            self.Properties["distinguishedname"] = object.get('distinguishedname', None).upper()
+        if 'distinguishedname' in _object.keys():
+            self.Properties["distinguishedname"] = _object.get('distinguishedname', None).upper()
 
-        if 'admincount' in object.keys():
-            self.Properties["admincount"] = int(object.get('admincount')) == 1 # do not move this lower, it may break imports for users
+        if 'admincount' in _object.keys():
+            self.Properties["admincount"] = int(_object.get('admincount')) == 1 # do not move this lower, it may break imports for users
         else:
             self.Properties["admincount"] = False
 
-        if 'description' in object.keys():
-            self.Properties["description"] = object.get('description')
+        if 'description' in _object.keys():
+            self.Properties["description"] = _object.get('description')
 
-        if 'member' in object.keys():
-            self.MemberDNs = [f'CN={dn.upper()}' for dn in object.get('member').split(', CN=')]
+        if 'member' in _object.keys():
+            self.MemberDNs = [f'CN={dn.upper()}' for dn in _object.get('member').split(', CN=')]
             if len(self.MemberDNs) > 0:
                 self.MemberDNs[0] = self.MemberDNs[0][3:]
 
-        if 'ntsecuritydescriptor' in object.keys():
-            self.RawAces = object['ntsecuritydescriptor']
+        if 'ntsecuritydescriptor' in _object.keys():
+            self.RawAces = _object['ntsecuritydescriptor']
 
-        if 'memberof' in object.keys():
-                self.MemberOfDNs = [f'CN={dn.upper()}' for dn in object.get('memberof').split(', CN=')]
+        if 'memberof' in _object.keys():
+                self.MemberOfDNs = [f'CN={dn.upper()}' for dn in _object.get('memberof').split(', CN=')]
                 if len(self.MemberOfDNs) > 0:
                     self.MemberOfDNs[0] = self.MemberOfDNs[0][3:]
 

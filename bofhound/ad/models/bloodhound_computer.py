@@ -29,8 +29,8 @@ class BloodHoundComputer(BloodHoundObject):
         "distributed com users": 562
     }
 
-    def __init__(self, object):
-        super().__init__(object)
+    def __init__(self, _object):
+        super().__init__(_object)
 
         self._entry_type = "Computer"
         self.not_collected = {
@@ -41,8 +41,8 @@ class BloodHoundComputer(BloodHoundObject):
         self.uac = None
         self.IsACLProtected = False
         self.IsDeleted = False
-        self.hostname = object.get('dnshostname', None)
-        self.PrimaryGroupSid = self.get_primary_membership(object) # Returns none if non-existent
+        self.hostname = _object.get('dnshostname', None)
+        self.PrimaryGroupSid = self.get_primary_membership(_object) # Returns none if non-existent
         self.sessions = None #['not currently supported by bofhound']
         self.AllowedToDelegate = []
         self.MemberOfDNs = []
@@ -53,37 +53,37 @@ class BloodHoundComputer(BloodHoundObject):
         self.local_group_members = {} # {group_name: [{member_sid, member_type}]}
         self.ipaddresses = []
 
-        if 'dnshostname' in object.keys():
-            self.hostname = object.get('dnshostname', None)
+        if 'dnshostname' in _object.keys():
+            self.hostname = _object.get('dnshostname', None)
             self.Properties['name'] = self.hostname.upper()
             logger.debug(f"Reading Computer object {ColorScheme.computer}{self.Properties['name']}[/]", extra=OBJ_EXTRA_FMT)
 
-        if 'msds-allowedtodelegateto' in object.keys():
-            self.AllowedToDelegate = object.get('msds-allowedtodelegateto').split(', ')
+        if 'msds-allowedtodelegateto' in _object.keys():
+            self.AllowedToDelegate = _object.get('msds-allowedtodelegateto').split(', ')
 
-        if 'useraccountcontrol' in object.keys():
-            self.uac = int(object.get('useraccountcontrol'))
+        if 'useraccountcontrol' in _object.keys():
+            self.uac = int(_object.get('useraccountcontrol'))
             self.Properties['unconstraineddelegation'] = self.uac & 0x00080000 == 0x00080000
             self.Properties['enabled'] = self.uac & 2 == 0
             self.Properties['trustedtoauth'] = self.uac & 0x01000000 == 0x01000000
             self.Properties['isdc'] = self.uac & 0x2000 == 0x2000
 
-        if 'operatingsystem' in object.keys():
-            self.Properties['operatingsystem'] = object.get('operatingsystem', 'Unknown')
+        if 'operatingsystem' in _object.keys():
+            self.Properties['operatingsystem'] = _object.get('operatingsystem', 'Unknown')
 
-        if 'operatingsystemservicepack' in object.keys() and 'operatingsystem' in self.Properties:
-            self.Properties['operatingsystem'] += f' {object.get("operatingsystemservicepack")}'
+        if 'operatingsystemservicepack' in _object.keys() and 'operatingsystem' in self.Properties:
+            self.Properties['operatingsystem'] += f' {_object.get("operatingsystemservicepack")}'
 
-        if 'sidhistory' in object.keys():
-            self.Properties['sidhistory'] = [LDAP_SID(bsid).formatCanonical() for bsid in object.get('sidhistory', [])]
+        if 'sidhistory' in _object.keys():
+            self.Properties['sidhistory'] = [LDAP_SID(bsid).formatCanonical() for bsid in _object.get('sidhistory', [])]
         else:
             self.Properties['sidhistory'] = []
 
-        if 'distinguishedname' in object.keys():
-            domain = ADUtils.ldap2domain(object.get('distinguishedname')).upper()
+        if 'distinguishedname' in _object.keys():
+            domain = ADUtils.ldap2domain(_object.get('distinguishedname')).upper()
             self.Properties['domain'] = domain
-            if 'samaccountname' in object.keys() and 'dnshostname' not in object.keys():
-                samacctname = object.get("samaccountname")
+            if 'samaccountname' in _object.keys() and 'dnshostname' not in _object.keys():
+                samacctname = _object.get("samaccountname")
                 if samacctname.endswith("$"):
                     name = f'{samacctname[:-1]}.{domain}'.upper()
                 else:
@@ -94,53 +94,53 @@ class BloodHoundComputer(BloodHoundObject):
         # TODO: HighValue / AdminCount
         self.Properties['highvalue'] = False
 
-        if 'ms-mcs-admpwdexpirationtime' in object.keys():
+        if 'ms-mcs-admpwdexpirationtime' in _object.keys():
             self.Properties['haslaps'] = True
         else:
             self.Properties['haslaps'] = False
 
-        if 'lastlogontimestamp' in object.keys():
+        if 'lastlogontimestamp' in _object.keys():
             self.Properties['lastlogontimestamp'] = ADUtils.win_timestamp_to_unix(
-                int(object.get('lastlogontimestamp'))
+                int(_object.get('lastlogontimestamp'))
             )
 
-        if 'lastlogon' in object.keys():
+        if 'lastlogon' in _object.keys():
             self.Properties['lastlogon'] = ADUtils.win_timestamp_to_unix(
-                int(object.get('lastlogon'))
+                int(_object.get('lastlogon'))
             )
 
-        if 'pwdlastset' in object.keys():
+        if 'pwdlastset' in _object.keys():
             self.Properties['pwdlastset'] = ADUtils.win_timestamp_to_unix(
-                int(object.get('pwdlastset'))
+                int(_object.get('pwdlastset'))
             )
 
-        if 'serviceprincipalname' in object.keys():
-            self.Properties['serviceprincipalnames'] = object.get('serviceprincipalname').split(', ')
+        if 'serviceprincipalname' in _object.keys():
+            self.Properties['serviceprincipalnames'] = _object.get('serviceprincipalname').split(', ')
 
-        if 'description' in object.keys():
-            self.Properties['description'] = object.get('description')
+        if 'description' in _object.keys():
+            self.Properties['description'] = _object.get('description')
         
-        if 'email' in object.keys():
-            self.Properties['email'] = object.get('email')
+        if 'email' in _object.keys():
+            self.Properties['email'] = _object.get('email')
 
-        if 'samaccounttype' in object.keys():
-            self.Properties['samaccounttype'] = object.get('samaccounttype')    
+        if 'samaccounttype' in _object.keys():
+            self.Properties['samaccounttype'] = _object.get('samaccounttype')
 
-        if 'ntsecuritydescriptor' in object.keys():
-            self.RawAces = object['ntsecuritydescriptor']
+        if 'ntsecuritydescriptor' in _object.keys():
+            self.RawAces = _object['ntsecuritydescriptor']
 
-        if 'memberof' in object.keys():
-                self.MemberOfDNs = [f'CN={dn.upper()}' for dn in object.get('memberof').split(', CN=')]
+        if 'memberof' in _object.keys():
+                self.MemberOfDNs = [f'CN={dn.upper()}' for dn in _object.get('memberof').split(', CN=')]
                 if len(self.MemberOfDNs) > 0:
                     self.MemberOfDNs[0] = self.MemberOfDNs[0][3:]
 
-        if 'email' in object.keys():
-            self.Properties['email'] = object.get('email')
+        if 'email' in _object.keys():
+            self.Properties['email'] = _object.get('email')
         else:
             self.Properties['email'] = None
 
-        if 'description' in object.keys():
-            self.Properties['description'] = object.get('description')
+        if 'description' in _object.keys():
+            self.Properties['description'] = _object.get('description')
         else:
             self.Properties['description'] = None
 

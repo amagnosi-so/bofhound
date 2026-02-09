@@ -169,7 +169,7 @@ class LzmaFileDataStream(FileDataStream):
                 first_file = next(iter(allfiles.values()))
                 return first_file.read()
         except py7zr.Bad7zFile as exc:
-            logger.error("Not 7z compressed LDAP dump file %s: %s", self.file_path, exc)
+            logger.debug("Not 7z compressed LDAP dump file %s: %s", self.file_path, exc)
 
         try:
             with open(self.file_path, 'rb') as f:
@@ -179,13 +179,13 @@ class LzmaFileDataStream(FileDataStream):
             return decompressor.decompress(compressed_data)
 
         except lzma.LZMAError as e:
-            logger.error("Not raw LZMA format (%s), trying XZ format", e)
+            logger.debug("Not raw LZMA format (%s), trying XZ format", e)
 
         try:
             with lzma.open(self.file_path, 'rb') as f:
                 return f.read()
         except lzma.LZMAError as exc:
-            logger.error("Not LZMA compressed LDAP dump file %s: %s", self.file_path, exc)
+            logger.debug("Not LZMA compressed LDAP dump file %s: %s", self.file_path, exc)
 
         try:
             data = self._last_resort_read_binary_payload()

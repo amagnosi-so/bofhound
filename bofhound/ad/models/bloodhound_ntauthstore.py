@@ -17,8 +17,8 @@ class BloodHoundNTAuthStore(BloodHoundObject):
     COMMON_PROPERTIES = [
     ]
 
-    def __init__(self, object):
-        super().__init__(object)
+    def __init__(self, _object):
+        super().__init__(_object)
 
         self._entry_type = "NTAuthStore"
         self.IsDeleted = False
@@ -27,25 +27,25 @@ class BloodHoundNTAuthStore(BloodHoundObject):
 
         self.Properties['certthumbprints'] = []
 
-        if 'objectguid' in object.keys():
-            self.ObjectIdentifier = object.get("objectguid").upper()
+        if 'objectguid' in _object.keys():
+            self.ObjectIdentifier = _object.get("objectguid").upper()
 
-        if 'distinguishedname' in object.keys():
-            domain = ADUtils.ldap2domain(object.get('distinguishedname')).upper()
+        if 'distinguishedname' in _object.keys():
+            domain = ADUtils.ldap2domain(_object.get('distinguishedname')).upper()
             self.Properties['domain'] = domain
-            self.Properties['distinguishedname'] = object.get('distinguishedname').upper()
+            self.Properties['distinguishedname'] = _object.get('distinguishedname').upper()
 
             # name relies on domain existing, so it can be appended to the end
-            if 'name' in object.keys():
-                self.Properties['name'] = f"{object.get('name').upper()}@{domain}"
+            if 'name' in _object.keys():
+                self.Properties['name'] = f"{_object.get('name').upper()}@{domain}"
 
-        if 'description' in object.keys():
-            self.Properties['description'] = object.get('description')
+        if 'description' in _object.keys():
+            self.Properties['description'] = _object.get('description')
         else:
             self.Properties['description'] = None
 
-        if 'cacertificate' in object.keys():
-            certificate_b64 = object.get("cacertificate")
+        if 'cacertificate' in _object.keys():
+            certificate_b64 = _object.get("cacertificate")
             
             certificate_b64_list = certificate_b64.split(", ")
             for cert in certificate_b64_list:
@@ -53,8 +53,8 @@ class BloodHoundNTAuthStore(BloodHoundObject):
                 thumbprint = hashlib.sha1(certificate_byte_array).hexdigest().upper()
                 self.Properties['certthumbprints'].append(thumbprint)
             
-        if 'ntsecuritydescriptor' in object.keys():
-            self.RawAces = object['ntsecuritydescriptor']
+        if 'ntsecuritydescriptor' in _object.keys():
+            self.RawAces = _object['ntsecuritydescriptor']
         
 
     def to_json(self, properties_level):

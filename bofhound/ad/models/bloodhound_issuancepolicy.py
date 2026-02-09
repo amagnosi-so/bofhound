@@ -17,8 +17,8 @@ class BloodHoundIssuancePolicy(BloodHoundObject):
     COMMON_PROPERTIES = [
     ]
 
-    def __init__(self, object):
-        super().__init__(object)
+    def __init__(self, _object):
+        super().__init__(_object)
 
         self._entry_type = "IssuancePolicy"
         self.IsDeleted = False
@@ -26,31 +26,31 @@ class BloodHoundIssuancePolicy(BloodHoundObject):
         self.IsACLProtected = False
         self.GroupLink = None # {}
 
-        if 'objectguid' in object.keys():
-            self.ObjectIdentifier = object.get("objectguid").upper()
+        if 'objectguid' in _object.keys():
+            self.ObjectIdentifier = _object.get("objectguid").upper()
 
-        if 'distinguishedname' in object.keys():
-            domain = ADUtils.ldap2domain(object.get('distinguishedname')).upper()
+        if 'distinguishedname' in _object.keys():
+            domain = ADUtils.ldap2domain(_object.get('distinguishedname')).upper()
             self.Properties['domain'] = domain
-            self.Properties['distinguishedname'] = object.get('distinguishedname').upper()
+            self.Properties['distinguishedname'] = _object.get('distinguishedname').upper()
 
             # name relies on domain existing, so it can be appended to the end
-            if 'displayname' in object.keys():
-                self.Properties['name'] = f"{object.get('displayname').upper()}@{domain}"
+            if 'displayname' in _object.keys():
+                self.Properties['name'] = f"{_object.get('displayname').upper()}@{domain}"
         
-        if 'displayname' in object.keys():
-            self.Properties['displayname'] = object.get('displayname')
+        if 'displayname' in _object.keys():
+            self.Properties['displayname'] = _object.get('displayname')
 
-        if 'description' in object.keys():
-            self.Properties['description'] = object.get('description')
+        if 'description' in _object.keys():
+            self.Properties['description'] = _object.get('description')
         else:
             self.Properties['description'] = None
 
-        if 'mspki-cert-template-oid' in object.keys():
-            self.Properties['mspki-cert-template-oid'] = object.get('mspki-cert-template-oid')
+        if 'mspki-cert-template-oid' in _object.keys():
+            self.Properties['mspki-cert-template-oid'] = _object.get('mspki-cert-template-oid')
 
-        if 'ntsecuritydescriptor' in object.keys():
-            self.RawAces = object['ntsecuritydescriptor']
+        if 'ntsecuritydescriptor' in _object.keys():
+            self.RawAces = _object['ntsecuritydescriptor']
         
 
     def to_json(self, properties_level):

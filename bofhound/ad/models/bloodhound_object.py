@@ -3,18 +3,19 @@ import hashlib
 import base64
 from asn1crypto import x509
 from datetime import datetime
-from bloodhound.enumeration.acls import SecurityDescriptor, ACL, ACCESS_ALLOWED_ACE, ACCESS_MASK, ACE, ACCESS_ALLOWED_OBJECT_ACE, has_extended_right, EXTRIGHTS_GUID_MAPPING, can_write_property, ace_applies
+from bloodhound.enumeration.acls import SecurityDescriptor, ACL, ACCESS_ALLOWED_ACE, ACCESS_MASK, ACE, \
+    ACCESS_ALLOWED_OBJECT_ACE, has_extended_right, EXTRIGHTS_GUID_MAPPING, can_write_property, ace_applies
 from bloodhound.ad.utils import ADUtils
 
 from bofhound.logger import logger, OBJ_EXTRA_FMT, ColorScheme
 from bofhound.ad.models.bloodhound_schema import BloodHoundSchema
 from bofhound.ad.helpers import PropertiesLevel
 
+
 # TODO: Move appropriate actions from this class to a super class of Users/Computers/maybe groups?
 
 
-class BloodHoundObject():
-
+class BloodHoundObject:
     GUI_PROPERTIES = [
     ]
 
@@ -25,24 +26,27 @@ class BloodHoundObject():
         'ntsecuritydescriptor', 'serviceprincipalname'
     ]
 
-    def __init__(self, object=None):
+    def __init__(self, _object=None):
         self.ObjectIdentifier = None
         self.Aces = []
         self.RawAces = None
         self.Properties = {}
 
-        if isinstance(object, dict):
+        if isinstance(_object, dict):
             # Ensure all keys are lowercase
-            for item in object.keys():
-                self.Properties[item.lower()] = object[item]
+            for item in _object.keys():
+                self.Properties[item.lower()] = _object[item]
 
-            self.ObjectIdentifier = BloodHoundObject.get_sid(object.get('objectsid', None), object.get('distinguishedname', None))
+            self.ObjectIdentifier = BloodHoundObject.get_sid(_object.get('objectsid', None),
+                                                             _object.get('distinguishedname', None))
 
-            if 'distinguishedname' in object.keys():
-                self.Properties["distinguishedname"] = object.get('distinguishedname', None).upper()
+            if 'distinguishedname' in _object.keys():
+                if _object.get('distinguishedname', None) is not None:
+                    self.Properties["distinguishedname"] = _object.get('distinguishedname').upper()
+                else:
+                    self.Properties["distinguishedname"] = None
 
-            self.__parse_whencreated(object)
-
+            self.__parse_whencreated(_object)
 
     def get_primary_membership(self, object):
         """
@@ -54,7 +58,6 @@ class BloodHoundObject():
         except (TypeError, KeyError, AttributeError):
             # Doesn't have a primarygroupid, means it is probably a Group instead of a user
             return None
-
 
     def merge_entry(self, object, base_preference=False):
         """Merge the properties of another BloodHoundObject in with this one.
@@ -87,8 +90,6 @@ class BloodHoundObject():
                 if not base_preference:
                     if getattr(object, attr):
                         setattr(self, attr, value)
-    
-
 
     def get_distinguished_name(self):
         try:
@@ -96,13 +97,11 @@ class BloodHoundObject():
         except KeyError:
             return None
 
-
     def get_property(self, property):
         try:
             return self.Properties[property]
         except KeyError:
             return None
-
 
     def to_json(self, properties_level):
         data = {
@@ -113,18 +112,17 @@ class BloodHoundObject():
             case PropertiesLevel.Standard:
                 for property in self.Properties.keys():
                     if property in self.GUI_PROPERTIES \
-                        and property not in self.NEVER_SHOW_PROPERTIES:
+                            and property not in self.NEVER_SHOW_PROPERTIES:
                         data["Properties"][property] = self.Properties[property]
             case PropertiesLevel.Member:
                 for property in self.Properties.keys():
                     if (property in self.COMMON_PROPERTIES or property in self.GUI_PROPERTIES) \
-                        and property not in self.NEVER_SHOW_PROPERTIES:
+                            and property not in self.NEVER_SHOW_PROPERTIES:
                         data["Properties"][property] = self.Properties[property]
             case PropertiesLevel.All:
                 data["Properties"] = self.Properties
 
         return data
-
 
     def __parse_whencreated(self, object):
         whencreated = object.get('whencreated', 0)
@@ -134,7 +132,6 @@ class BloodHoundObject():
             self.Properties['whencreated'] = whencreated
         except:
             self.Properties['whencreated'] = whencreated
-
 
     # used by Domains and OUs
     def add_linked_gpo(self, object, gp_link_options):
@@ -148,7 +145,6 @@ class BloodHoundObject():
         }
         self.Links.append(link)
 
-
     # used by Domains and OUs
     def add_ou_member(self, object, object_type):
         member = {
@@ -156,7 +152,6 @@ class BloodHoundObject():
             "ObjectType": object_type
         }
         self.ChildObjects.append(member)
-
 
     @staticmethod
     def get_sid(sid, dn=None):
@@ -168,7 +163,6 @@ class BloodHoundObject():
 
         return PrincipalSid
 
-
     # Should probably move to ADDS?
     @staticmethod
     def get_domain_component(dn):
@@ -178,45 +172,43 @@ class BloodHoundObject():
                 dc += f"{component},"
         return dc[:-1]
 
-
     @staticmethod
     def get_dn(domain):
         components = domain.split('.')
         base = ''
         for comp in components:
             base += f',DC={comp}'
-        
+
         return base[1:]
-    
-    
+
     @staticmethod
     def get_cn_from_dn(dn):
         for component in dn.split(',', 1):
             if component.startswith('CN='):
                 return component[3:]
-    
+
     #
     # for AIACAs, EnterpriseCAs, and RootCAs
     #
     def parse_cacertificate(self, object):
         certificate_b64 = object.get("cacertificate")
-            
+
         certificate_byte_array = base64.b64decode(certificate_b64)
-        
+
         #
         # thumbprint
         #
         thumbprint = hashlib.sha1(certificate_byte_array).hexdigest().upper()
         self.Properties['certthumbprint'] = thumbprint
-        
+
         #
         # certname
         #
         certificate_byte_array = base64.b64decode(certificate_b64)
         ca_cert = x509.Certificate.load(certificate_byte_array)["tbs_certificate"]
-        self.x509Certificate = ca_cert # set for post-processing
+        self.x509Certificate = ca_cert  # set for post-processing
         self.Properties['certname'] = ca_cert['subject'].native.get('common_name', thumbprint)
-        
+
         #
         # cert chain
         # not sure that Python libs offer a way to build the chain without access to the issuer cert like it seems SharpHound  does
@@ -237,4 +229,3 @@ class BloodHoundObject():
                     self.Properties['hasbasicconstraints'] = True
                     self.Properties['basicconstraintpathlength'] = basic_constraints['path_len_constraint'].native
                 break
-

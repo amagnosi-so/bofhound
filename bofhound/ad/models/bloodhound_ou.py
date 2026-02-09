@@ -15,34 +15,34 @@ class BloodHoundOU(BloodHoundObject):
     COMMON_PROPERTIES = [
     ]
 
-    def __init__(self, object):
-        super().__init__(object)
+    def __init__(self, _object):
+        super().__init__(_object)
 
         self._entry_type = "OU"
         self.GPLinks = []
         self.ContainedBy = {}
         self.Properties["blocksinheritance"] = False
 
-        if 'distinguishedname' in object.keys() and 'ou' in object.keys():
-            self.Properties["domain"] = ADUtils.ldap2domain(object.get('distinguishedname').upper())
-            self.Properties["name"] = f"{object.get('ou').upper()}@{self.Properties['domain']}"
+        if 'distinguishedname' in _object.keys() and 'ou' in _object.keys():
+            self.Properties["domain"] = ADUtils.ldap2domain(_object.get('distinguishedname').upper())
+            self.Properties["name"] = f"{_object.get('ou').upper()}@{self.Properties['domain']}"
             logger.debug(f"Reading OU object {ColorScheme.ou}{self.Properties['name']}[/]", extra=OBJ_EXTRA_FMT)
 
-        if 'objectguid' in object.keys():
-            self.ObjectIdentifier = object.get("objectguid").upper().upper()
+        if 'objectguid' in _object.keys():
+            self.ObjectIdentifier = _object.get("objectguid").upper().upper()
 
-        if 'ntsecuritydescriptor' in object.keys():
-            self.RawAces = object['ntsecuritydescriptor']
+        if 'ntsecuritydescriptor' in _object.keys():
+            self.RawAces = _object['ntsecuritydescriptor']
 
-        if 'description' in object.keys():
-            self.Properties["description"] = object.get('description')
+        if 'description' in _object.keys():
+            self.Properties["description"] = _object.get('description')
 
-        if 'gplink' in object.keys():
+        if 'gplink' in _object.keys():
             # [['DN1', 'GPLinkOptions1'], ['DN2', 'GPLinkOptions2'], ...]
-            self.GPLinks = [link.upper()[:-1].split(';') for link in object.get('gplink').split('[LDAP://')][1:]
+            self.GPLinks = [link.upper()[:-1].split(';') for link in _object.get('gplink').split('[LDAP://')][1:]
 
-        if 'gpoptions' in object.keys():
-            gpoptions = object.get('gpoptions')
+        if 'gpoptions' in _object.keys():
+            gpoptions = _object.get('gpoptions')
             if gpoptions == '1':
                 self.Properties["blocksinheritance"] = True
 

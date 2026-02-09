@@ -22,9 +22,9 @@ class BloodHoundCertTemplate(BloodHoundObject):
     COMMON_PROPERTIES = [
     ]
 
-    def __init__(self, object):
+    def __init__(self, _object):
 
-        super().__init__(object)
+        super().__init__(_object)
 
         self._entry_type = "PKI Template"
         self.GPLinks = []
@@ -32,41 +32,41 @@ class BloodHoundCertTemplate(BloodHoundObject):
         self.IsACLProtected = False
         self.cas_ids = []
 
-        if 'objectguid' in object.keys():
-            self.ObjectIdentifier = object.get("objectguid").upper()
+        if 'objectguid' in _object.keys():
+            self.ObjectIdentifier = _object.get("objectguid").upper()
 
-        if 'distinguishedname' in object.keys():
-            domain = ADUtils.ldap2domain(object.get('distinguishedname')).upper()
+        if 'distinguishedname' in _object.keys():
+            domain = ADUtils.ldap2domain(_object.get('distinguishedname')).upper()
             self.Properties['domain'] = domain
-            self.Properties['distinguishedname'] = object.get('distinguishedname').upper()
-            self.Properties['name'] = self.get_cn_from_dn(object.get('distinguishedname')) + "@" + domain
+            self.Properties['distinguishedname'] = _object.get('distinguishedname').upper()
+            self.Properties['name'] = self.get_cn_from_dn(_object.get('distinguishedname')) + "@" + domain
 
-        if 'description' in object.keys():
-            self.Properties['description'] = object.get('description')
+        if 'description' in _object.keys():
+            self.Properties['description'] = _object.get('description')
         else:
             self.Properties['description'] = None
 
-        if 'pkiexpirationperiod' in object.keys():
-            pKIExpirationPeriod_b64 = object.get("pkiexpirationperiod")
+        if 'pkiexpirationperiod' in _object.keys():
+            pKIExpirationPeriod_b64 = _object.get("pkiexpirationperiod")
             pKIExpirationPeriod_byte_array = base64.b64decode(pKIExpirationPeriod_b64)
             self.Properties["validityperiod"] = span_to_str(filetime_to_span(pKIExpirationPeriod_byte_array))
 
-        if 'pkioverlapperiod' in object.keys():
-            pKIRenewalPeriod_b64 = object.get("pkioverlapperiod")
+        if 'pkioverlapperiod' in _object.keys():
+            pKIRenewalPeriod_b64 = _object.get("pkioverlapperiod")
             pKIRenewalPeriod_byte_array = base64.b64decode(pKIRenewalPeriod_b64)
             self.Properties["renewalperiod"] = span_to_str(filetime_to_span(pKIRenewalPeriod_byte_array))
 
-        if 'mspki-template-schema-version' in object.keys():
-            self.Properties['schemaversion'] = int(object.get('mspki-template-schema-version'))
+        if 'mspki-template-schema-version' in _object.keys():
+            self.Properties['schemaversion'] = int(_object.get('mspki-template-schema-version'))
 
-        if 'displayname' in object.keys():
-            self.Properties["displayname"] = object.get("displayname")
+        if 'displayname' in _object.keys():
+            self.Properties["displayname"] = _object.get("displayname")
 
-        if 'mspki-cert-template-oid' in object.keys():
-            self.Properties["oid"] = object.get("mspki-cert-template-oid")
+        if 'mspki-cert-template-oid' in _object.keys():
+            self.Properties["oid"] = _object.get("mspki-cert-template-oid")
 
-        if 'mspki-enrollment-flag' in object.keys():
-            enrollment_flag = object.get("mspki-enrollment-flag")
+        if 'mspki-enrollment-flag' in _object.keys():
+            enrollment_flag = _object.get("mspki-enrollment-flag")
             if enrollment_flag is not None:
                 enrollment_flag = MS_PKI_ENROLLMENT_FLAG(int(enrollment_flag))
             else:
@@ -83,8 +83,8 @@ class BloodHoundCertTemplate(BloodHoundObject):
             )
             self.Properties["nosecurityextension"] = no_security_extension
         
-        if 'mspki-certificate-name-flag' in object.keys():
-            certificate_name_flag = object.get('mspki-certificate-name-flag')
+        if 'mspki-certificate-name-flag' in _object.keys():
+            certificate_name_flag = _object.get('mspki-certificate-name-flag')
             if certificate_name_flag is not None:
                 certificate_name_flag = MS_PKI_CERTIFICATE_NAME_FLAG(
                     int(certificate_name_flag)
@@ -150,8 +150,8 @@ class BloodHoundCertTemplate(BloodHoundObject):
             self.Properties["subjectrequireemail"] = subjectrequireemail
 
         ekus = []
-        if 'pkiextendedkeyusage' in object.keys():
-            ekus = object.get('pkiextendedkeyusage').split(', ')
+        if 'pkiextendedkeyusage' in _object.keys():
+            ekus = _object.get('pkiextendedkeyusage').split(', ')
 
             ### This parses ekus to readable format
             #ekus = list(
@@ -185,13 +185,13 @@ class BloodHoundCertTemplate(BloodHoundObject):
         #self.Properties["Certificate Authorities"] = []
         #self.Properties["Enabled"] = True
 
-        if 'mspki-certificate-application-policy' in object.keys():
-            self.Properties['certificateapplicationpolicy'] = object.get('mspki-certificate-application-policy').split(', ')
+        if 'mspki-certificate-application-policy' in _object.keys():
+            self.Properties['certificateapplicationpolicy'] = _object.get('mspki-certificate-application-policy').split(', ')
         else:
             self.Properties['certificateapplicationpolicy'] = []
             
-        if 'mspki-ra-signature' in object.keys():
-            authorized_signatures_required = object.get("mspki-ra-signature")
+        if 'mspki-ra-signature' in _object.keys():
+            authorized_signatures_required = _object.get("mspki-ra-signature")
             if authorized_signatures_required is not None:
                 authorized_signatures_required = int(authorized_signatures_required)
             else:
@@ -201,15 +201,15 @@ class BloodHoundCertTemplate(BloodHoundObject):
 
 
         self.Properties['applicationpolicies'] = []
-        if 'mspki-private-key-flag' in object.keys():
-            private_key_flag = object.get("mspki-private-key-flag")
+        if 'mspki-private-key-flag' in _object.keys():
+            private_key_flag = _object.get("mspki-private-key-flag")
             if private_key_flag is not None:
                 private_key_flag = MS_PKI_PRIVATE_KEY_FLAG(int(private_key_flag))
             else:
                 private_key_flag = MS_PKI_PRIVATE_KEY_FLAG(0)
 
-        if 'mspki-ra-application-policies' in object.keys():
-            applicationpolicies = object.get('mspki-ra-application-policies')
+        if 'mspki-ra-application-policies' in _object.keys():
+            applicationpolicies = _object.get('mspki-ra-application-policies')
             schemaversions_noparsing = [0, 1, 2]
 
             hasUseLegacyProvider = (
@@ -230,8 +230,8 @@ class BloodHoundCertTemplate(BloodHoundObject):
                 result_array = list(result)
                 self.Properties['applicationpolicies'] = result_array
 
-        if 'mspki-ra-policies' in object.keys():
-            self.Properties['issuancepolicies'] = object.get('mspki-ra-policies').split(', ')
+        if 'mspki-ra-policies' in _object.keys():
+            self.Properties['issuancepolicies'] = _object.get('mspki-ra-policies').split(', ')
         else:
             self.Properties['issuancepolicies'] = []
 
@@ -245,8 +245,8 @@ class BloodHoundCertTemplate(BloodHoundObject):
         AuthenticationOIDs = ['1.3.6.1.5.5.7.3.2', '1.3.6.1.5.2.3.4', '1.3.6.1.4.1.311.20.2.2', '2.5.29.37.0']
         self.Properties['authenticationenabled'] = bool(set(self.Properties['effectiveekus']).intersection(AuthenticationOIDs)) or len(self.Properties['effectiveekus']) == 0
 
-        if 'ntsecuritydescriptor' in object.keys():
-            self.RawAces = object['ntsecuritydescriptor']
+        if 'ntsecuritydescriptor' in _object.keys():
+            self.RawAces = _object['ntsecuritydescriptor']
 
     def to_json(self, properties_level):
         self.Properties['isaclprotected'] = self.IsACLProtected

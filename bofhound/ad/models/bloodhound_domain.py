@@ -15,13 +15,13 @@ class BloodHoundDomain(BloodHoundObject):
     COMMON_PROPERTIES = [
     ]
 
-    def __init__(self, object):
-        super().__init__(object)
+    def __init__(self, _object):
+        super().__init__(_object)
 
         self._entry_type = "Domain"
         self.GPLinks = []
         self.ContainedBy = {}
-        level_id = object.get('msds-behavior-version', 0)
+        level_id = _object.get('msds-behavior-version', 0)
         try:
             functional_level = ADUtils.FUNCTIONAL_LEVELS[int(level_id)]
         except KeyError:
@@ -31,29 +31,29 @@ class BloodHoundDomain(BloodHoundObject):
 
         self.Properties['collected'] = True
 
-        if 'distinguishedname' in object.keys():
-            self.Properties["name"] = ADUtils.ldap2domain(object.get('distinguishedname').upper())
+        if 'distinguishedname' in _object.keys():
+            self.Properties["name"] = ADUtils.ldap2domain(_object.get('distinguishedname').upper())
             self.Properties["domain"] = self.Properties["name"]
-            dc = BloodHoundObject.get_domain_component(object.get('distinguishedname').upper())
+            dc = BloodHoundObject.get_domain_component(_object.get('distinguishedname').upper())
             logger.debug(f"Reading Domain object {ColorScheme.domain}{self.Properties['name']}[/]", extra=OBJ_EXTRA_FMT)
 
-        if 'objectsid' in object.keys():
-            self.Properties["domainsid"] = object.get('objectsid')
+        if 'objectsid' in _object.keys():
+            self.Properties["domainsid"] = _object.get('objectsid')
 
-        if 'distinguishedname' in object.keys():
-            self.Properties['distinguishedname'] = object.get('distinguishedname').upper()
+        if 'distinguishedname' in _object.keys():
+            self.Properties['distinguishedname'] = _object.get('distinguishedname').upper()
 
-        if 'description' in object.keys():
-            self.Properties["description"] = object.get('description')
+        if 'description' in _object.keys():
+            self.Properties["description"] = _object.get('description')
         else:
             self.Properties["description"] = None
 
-        if 'ntsecuritydescriptor' in object.keys():
-            self.RawAces = object['ntsecuritydescriptor']
+        if 'ntsecuritydescriptor' in _object.keys():
+            self.RawAces = _object['ntsecuritydescriptor']
 
-        if 'gplink' in object.keys():
+        if 'gplink' in _object.keys():
             # [['DN1', 'GPLinkOptions1'], ['DN2', 'GPLinkOptions2'], ...]
-            self.GPLinks = [link.upper()[:-1].split(';') for link in object.get('gplink').split('[LDAP://')][1:]
+            self.GPLinks = [link.upper()[:-1].split(';') for link in _object.get('gplink').split('[LDAP://')][1:]
 
         self.Properties["highvalue"] = True
 
