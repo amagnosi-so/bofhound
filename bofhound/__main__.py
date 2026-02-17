@@ -136,6 +136,7 @@ def main(
         )
 
     ldap_objects = results.get_ldap_objects()
+
     local_objects = results.get_local_group_memberships() + results.get_sessions() + \
         results.get_privileged_sessions() + results.get_registry_sessions()
     logger.info("Parsed %d LDAP objects", len(ldap_objects))
